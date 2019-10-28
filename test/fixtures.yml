@@ -711,6 +711,10 @@ payflow_uk:
   password: PASSWORD
   partner: PayPalUk
 
+payleap:
+  login: LOGIN
+  password: PASSWORD
+
 payment_express:
   login: LOGIN
   password: PASSWORD
