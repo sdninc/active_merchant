@@ -4,7 +4,7 @@ module ActiveMerchant #:nodoc:
       self.test_url = 'https://sandbox.ebanxpay.com/ws/'
       self.live_url = 'https://api.ebanxpay.com/ws/'
 
-      self.supported_countries = ['BR', 'MX', 'CO', 'CL', 'AR']
+      self.supported_countries = %w(BR MX CO CL AR PE)
       self.default_currency = 'USD'
       self.supported_cardtypes = [:visa, :master, :american_express, :discover, :diners_club]
 
@@ -73,7 +73,7 @@ module ActiveMerchant #:nodoc:
         post = {}
         add_integration_key(post)
         post[:hash] = authorization
-        post[:amount] = amount(money)
+        post[:amount] = amount(money) if options[:include_capture_amount].to_s == 'true'
 
         commit(:capture, post)
       end

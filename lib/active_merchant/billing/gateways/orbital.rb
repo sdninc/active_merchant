@@ -456,7 +456,7 @@ module ActiveMerchant #:nodoc:
         unless creditcard.nil?
           if creditcard.verification_value?
             xml.tag! :CardSecValInd, '1' if %w( visa discover ).include?(creditcard.brand)
-            xml.tag! :CardSecVal,  creditcard.verification_value
+            xml.tag! :CardSecVal, creditcard.verification_value
           end
         end
       end
@@ -565,15 +565,17 @@ module ActiveMerchant #:nodoc:
         return parameters[:mit_msg_type] if parameters[:mit_msg_type]
         return 'CSTO' if parameters[:stored_credential][:initial_transaction]
         return unless parameters[:stored_credential][:initiator] && parameters[:stored_credential][:reason_type]
-        initiator = case parameters[:stored_credential][:initiator]
-        when 'customer' then 'C'
-        when 'merchant' then 'M'
-        end
-        reason = case parameters[:stored_credential][:reason_type]
-        when 'recurring' then 'REC'
-        when 'installment' then 'INS'
-        when 'unscheduled' then 'USE'
-        end
+        initiator =
+          case parameters[:stored_credential][:initiator]
+          when 'customer' then 'C'
+          when 'merchant' then 'M'
+          end
+        reason =
+          case parameters[:stored_credential][:reason_type]
+          when 'recurring' then 'REC'
+          when 'installment' then 'INS'
+          when 'unscheduled' then 'USE'
+          end
 
         "#{initiator}#{reason}"
       end
@@ -609,11 +611,12 @@ module ActiveMerchant #:nodoc:
         request = ->(url) { parse(ssl_post(url, order, headers)) }
 
         # Failover URL will be attempted in the event of a connection error
-        response = begin
-          request.call(remote_url)
-        rescue ConnectionError
-          request.call(remote_url(:secondary))
-        end
+        response =
+          begin
+            request.call(remote_url)
+          rescue ConnectionError
+            request.call(remote_url(:secondary))
+          end
 
         Response.new(success?(response, message_type), message_from(response), response,
           {
@@ -640,7 +643,7 @@ module ActiveMerchant #:nodoc:
           response[:profile_proc_status] == SUCCESS
         else
           response[:proc_status] == SUCCESS &&
-          APPROVED.include?(response[:resp_code])
+            APPROVED.include?(response[:resp_code])
         end
       end
 

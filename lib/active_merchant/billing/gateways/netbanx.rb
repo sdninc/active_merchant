@@ -130,8 +130,8 @@ module ActiveMerchant #:nodoc:
         post[:card][:cvv]        = credit_card.verification_value
         post[:card][:cardExpiry] = expdate(credit_card)
 
-        post[:authentication]  = map_3ds(options[:three_d_secure]) if options[:three_d_secure]
-        post[:card][:billingAddress]  = map_address(options[:billing_address]) if options[:billing_address]
+        post[:authentication] = map_3ds(options[:three_d_secure]) if options[:three_d_secure]
+        post[:card][:billingAddress] = map_address(options[:billing_address]) if options[:billing_address]
       end
 
       def add_invoice(post, money, options)
@@ -199,12 +199,13 @@ module ActiveMerchant #:nodoc:
 
       def commit(method, uri, parameters)
         params = parameters.to_json unless parameters.nil?
-        response = begin
-          parse(ssl_request(method, get_url(uri), params, headers))
-        rescue ResponseError => e
-          return Response.new(false, 'Invalid Login') if(e.response.code == '401')
-          parse(e.response.body)
-        end
+        response =
+          begin
+            parse(ssl_request(method, get_url(uri), params, headers))
+          rescue ResponseError => e
+            return Response.new(false, 'Invalid Login') if(e.response.code == '401')
+            parse(e.response.body)
+          end
 
         success = success_from(response)
         Response.new(

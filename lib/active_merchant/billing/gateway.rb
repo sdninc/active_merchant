@@ -123,8 +123,9 @@ module ActiveMerchant #:nodoc:
       class_attribute :supported_cardtypes
       self.supported_cardtypes = []
 
+      # This default list of currencies without fractions are from https://en.wikipedia.org/wiki/ISO_4217
       class_attribute :currencies_without_fractions, :currencies_with_three_decimal_places
-      self.currencies_without_fractions = %w(BIF BYR CLP CVE DJF GNF ISK JPY KMF KRW PYG RWF UGX VND VUV XAF XOF XPF)
+      self.currencies_without_fractions = %w(BIF BYR CLP CVE DJF GNF ISK JPY KMF KRW PYG RWF UGX UYI VND VUV XAF XOF XPF)
       self.currencies_with_three_decimal_places = %w()
 
       class_attribute :homepage_url
@@ -248,12 +249,13 @@ module ActiveMerchant #:nodoc:
 
       def amount(money)
         return nil if money.nil?
-        cents = if money.respond_to?(:cents)
-                  ActiveMerchant.deprecated 'Support for Money objects is deprecated and will be removed from a future release of ActiveMerchant. Please use an Integer value in cents'
-                  money.cents
-                else
-                  money
-        end
+        cents =
+          if money.respond_to?(:cents)
+            ActiveMerchant.deprecated 'Support for Money objects is deprecated and will be removed from a future release of ActiveMerchant. Please use an Integer value in cents'
+            money.cents
+          else
+            money
+          end
 
         raise ArgumentError, 'money amount must be a positive Integer in cents.' if money.is_a?(String)
 

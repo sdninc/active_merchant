@@ -138,7 +138,7 @@ module ActiveMerchant #:nodoc:
 
       # add credit card details to be stored by eway. NOTE eway requires "title" field
       def add_creditcard(post, creditcard)
-        post[:CCNumber]  = creditcard.number
+        post[:CCNumber] = creditcard.number
         post[:CCExpiryMonth]  = sprintf('%.2i', creditcard.month)
         post[:CCExpiryYear] = sprintf('%.4i', creditcard.year)[-2..-1]
         post[:CCNameOnCard] = creditcard.name
@@ -214,11 +214,12 @@ module ActiveMerchant #:nodoc:
       end
 
       def commit(action, post)
-        raw = begin
-          ssl_post(test? ? self.test_url : self.live_url, soap_request(post, action), 'Content-Type' => 'application/soap+xml; charset=utf-8')
-        rescue ResponseError => e
-          e.response.body
-        end
+        raw =
+          begin
+            ssl_post(test? ? self.test_url : self.live_url, soap_request(post, action), 'Content-Type' => 'application/soap+xml; charset=utf-8')
+          rescue ResponseError => e
+            e.response.body
+          end
         response = parse(raw)
 
         EwayResponse.new(response[:success], response[:message], response,

@@ -51,6 +51,7 @@ class CredoraxTest < Test::Unit::TestCase
     assert_success response
 
     assert_equal '8a82944a5351570601535955efeb513c;006596;02617cf5f02ccaed239b6521748298c5;purchase', response.authorization
+    assert_equal 'Succeeded', response.message
     assert response.test?
   end
 
@@ -79,6 +80,7 @@ class CredoraxTest < Test::Unit::TestCase
     end.respond_with(successful_capture_response)
 
     assert_success capture
+    assert_equal 'Succeeded', response.message
   end
 
   def test_failed_authorize
@@ -97,6 +99,7 @@ class CredoraxTest < Test::Unit::TestCase
     end.respond_with(failed_capture_response)
 
     assert_failure response
+    assert_equal '2. At least one of input parameters is malformed.: Parameter [g4] cannot be empty.', response.message
   end
 
   def test_successful_void
@@ -114,6 +117,7 @@ class CredoraxTest < Test::Unit::TestCase
     end.respond_with(successful_void_response)
 
     assert_success void
+    assert_equal 'Succeeded', void.message
   end
 
   def test_failed_void
@@ -124,6 +128,7 @@ class CredoraxTest < Test::Unit::TestCase
     end.respond_with(failed_void_response)
 
     assert_failure response
+    assert_equal '2. At least one of input parameters is malformed.: Parameter [g4] cannot be empty.', response.message
   end
 
   def test_successful_refund
@@ -141,6 +146,7 @@ class CredoraxTest < Test::Unit::TestCase
     end.respond_with(successful_refund_response)
 
     assert_success refund
+    assert_equal 'Succeeded', refund.message
   end
 
   def test_failed_refund
@@ -149,6 +155,39 @@ class CredoraxTest < Test::Unit::TestCase
     end.respond_with(failed_refund_response)
 
     assert_failure response
+    assert_equal '2. At least one of input parameters is malformed.: Parameter [g4] cannot be empty.', response.message
+  end
+
+  def test_successful_referral_cft
+    response = stub_comms do
+      @gateway.purchase(@amount, @credit_card)
+    end.respond_with(successful_purchase_response)
+
+    assert_success response
+    assert_equal '8a82944a5351570601535955efeb513c;006596;02617cf5f02ccaed239b6521748298c5;purchase', response.authorization
+
+    referral_cft = stub_comms do
+      @gateway.refund(@amount, response.authorization, referral_cft: true)
+    end.check_request do |endpoint, data, headers|
+      assert_match(/8a82944a5351570601535955efeb513c/, data)
+      # Confirm that the transaction type is `referral_cft`
+      assert_match(/O=34/, data)
+    end.respond_with(successful_referral_cft_response)
+
+    assert_success referral_cft
+    assert_equal 'Succeeded', referral_cft.message
+  end
+
+  def test_failed_referral_cft
+    response = stub_comms do
+      @gateway.refund(nil, '', referral_cft: true)
+    end.check_request do |endpoint, data, headers|
+      # Confirm that the transaction type is `referral_cft`
+      assert_match(/O=34/, data)
+    end.respond_with(failed_referral_cft_response)
+
+    assert_failure response
+    assert_equal 'Referred to transaction has not been found.', response.message
   end
 
   def test_successful_credit
@@ -159,6 +198,7 @@ class CredoraxTest < Test::Unit::TestCase
     assert_success response
 
     assert_equal '8a82944a53515706015359604c135301;;868f8b942fae639d28e27e8933d575d4;credit', response.authorization
+    assert_equal 'Succeeded', response.message
     assert response.test?
   end
 
@@ -225,6 +265,7 @@ class CredoraxTest < Test::Unit::TestCase
       assert_match(/3ds_shipaddrline1=456\+My\+Street/, data)
       assert_match(/3ds_shipaddrcountry=CA/, data)
       assert_match(/3ds_shipaddrcity=Ottawa/, data)
+      refute_match(/3ds_version/, data)
     end.respond_with(successful_purchase_response)
 
     assert_success response
@@ -234,12 +275,13 @@ class CredoraxTest < Test::Unit::TestCase
   end
 
   def test_purchase_adds_3d_secure_fields
-    options_with_3ds = @options.merge({eci: 'sample-eci', cavv: 'sample-cavv', xid: 'sample-xid'})
+    options_with_3ds = @options.merge({eci: 'sample-eci', cavv: 'sample-cavv', xid: 'sample-xid', three_ds_version: '1'})
 
     response = stub_comms do
       @gateway.purchase(@amount, @credit_card, options_with_3ds)
     end.check_request do |endpoint, data, headers|
       assert_match(/i8=sample-eci%3Asample-cavv%3Asample-xid/, data)
+      assert_match(/3ds_version=1.0/, data)
     end.respond_with(successful_purchase_response)
 
     assert_success response
@@ -254,7 +296,6 @@ class CredoraxTest < Test::Unit::TestCase
     response = stub_comms do
       @gateway.purchase(@amount, @credit_card, options_with_3ds)
     end.check_request do |endpoint, data, headers|
-      p data
       assert_match(/3ds_channel=03/, data)
     end.respond_with(successful_purchase_response)
 
@@ -271,6 +312,7 @@ class CredoraxTest < Test::Unit::TestCase
       @gateway.authorize(@amount, @credit_card, options_with_3ds)
     end.check_request do |endpoint, data, headers|
       assert_match(/i8=sample-eci%3Asample-cavv%3Asample-xid/, data)
+      assert_match(/3ds_version=1.0/, data)
     end.respond_with(successful_purchase_response)
 
     assert_success response
@@ -295,7 +337,7 @@ class CredoraxTest < Test::Unit::TestCase
   end
 
   def test_adds_3ds2_fields_via_normalized_hash
-    version = '2.0'
+    version = '2'
     eci = '05'
     cavv = '637574652070757070792026206b697474656e73'
     ds_transaction_id = '97267598-FAE6-48F2-8083-C23433990FBC'
@@ -312,7 +354,7 @@ class CredoraxTest < Test::Unit::TestCase
       @gateway.purchase(@amount, @credit_card, options_with_normalized_3ds)
     end.check_request do |endpoint, data, headers|
       assert_match(/i8=#{eci}%3A#{cavv}%3Anone/, data)
-      assert_match(/3ds_version=#{version}/, data)
+      assert_match(/3ds_version=2.0/, data)
       assert_match(/3ds_dstrxid=#{ds_transaction_id}/, data)
     end.respond_with(successful_purchase_response)
   end
@@ -363,6 +405,16 @@ class CredoraxTest < Test::Unit::TestCase
     end.check_request do |endpoint, data, headers|
       assert_match(/a9=8/, data)
     end.respond_with(successful_credit_response)
+  end
+
+  def test_authorize_adds_authorization_details
+    options_with_auth_details = @options.merge({authorization_type: '2', multiple_capture_count: '5' })
+    stub_comms do
+      @gateway.authorize(@amount, @credit_card, options_with_auth_details)
+    end.check_request do |endpoint, data, headers|
+      assert_match(/a10=2/, data)
+      assert_match(/a11=5/, data)
+    end.respond_with(successful_authorize_response)
   end
 
   def test_purchase_adds_submerchant_id
@@ -784,6 +836,14 @@ class CredoraxTest < Test::Unit::TestCase
 
   def failed_refund_response
     'M=SPREE978&O=5&T=03%2F09%2F2016+03%3A16%3A06&V=413&a1=c2b481deffe0e27bdef1439655260092&a2=2&a4=-&a5=EUR&b1=-&z1=1A-1&z2=-9&z3=2.+At+least+one+of+input+parameters+is+malformed.%3A+Parameter+%5Bg4%5D+cannot+be+empty.&K=c2f6112b40c61859d03684ac8e422766'
+  end
+
+  def successful_referral_cft_response
+    'M=SPREE978&O=34&T=11%2F15%2F2019+15%3A56%3A08&V=413&a1=e852c517da0ffb0cde45671b39165449&a2=2&a4=100&a9=9&b2=2&g2=XZZ72c3228fc3b58525STV56T7YMFAJB&z1=XZZ72e64209459e8C2BAMTBS65MCNGIF&z13=931924132623&z2=0&z3=Transaction+has+been+executed+successfully.&z33=CREDORAX&z34=59990010&z39=XZZ72e64209459e8C2BAMTBS65MCNGIF&z4=HOSTOK&z6=00&K=76f8a35c3357a7613d63438bd86c06d9'
+  end
+
+  def failed_referral_cft_response
+    'T=11%2F15%2F2019+17%3A17%3A45&a1=896ffaf13766fff647d863e8ab0a707c&z1=XZZ7246087744e7993DRONGBWN4RNFWJ&z2=-9&z3=Referred+to+transaction+has+not+been+found.'
   end
 
   def successful_credit_response

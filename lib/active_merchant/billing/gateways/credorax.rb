@@ -151,6 +151,7 @@ module ActiveMerchant #:nodoc:
         add_submerchant_id(post, options)
         add_stored_credential(post, options)
         add_processor(post, options)
+        add_authorization_details(post, options)
 
         commit(:authorize, post)
       end
@@ -187,8 +188,13 @@ module ActiveMerchant #:nodoc:
         add_echo(post, options)
         add_submerchant_id(post, options)
         add_processor(post, options)
+        add_email(post, options)
 
-        commit(:refund, post)
+        if options[:referral_cft]
+          commit(:referral_cft, post)
+        else
+          commit(:refund, post)
+        end
       end
 
       def credit(amount, payment_method, options={})
@@ -300,7 +306,6 @@ module ActiveMerchant #:nodoc:
           options.dig(:stored_credential, :initiator) == 'merchant' ? post[:'3ds_channel'] = '03' : post[:'3ds_channel'] = '02'
           post[:'3ds_redirect_url'] = three_ds_2_options[:notification_url]
           post[:'3ds_challengewindowsize'] = options[:three_ds_challenge_window_size] || '03'
-          post[:'3ds_version'] = options[:three_ds_version] if options[:three_ds_version]
           post[:d5] = browser_info[:user_agent]
           post[:'3ds_transtype'] = options[:transaction_type] || '01'
           post[:'3ds_browsertz'] = browser_info[:timezone]
@@ -325,6 +330,7 @@ module ActiveMerchant #:nodoc:
 
       def add_3d_secure_1_data(post, options)
         post[:i8] = build_i8(options[:eci], options[:cavv], options[:xid])
+        post[:'3ds_version'] = options[:three_ds_version].nil? || options[:three_ds_version] == '1' ? '1.0' : options[:three_ds_version]
       end
 
       def add_normalized_3d_secure_2_data(post, options)
@@ -334,7 +340,7 @@ module ActiveMerchant #:nodoc:
           three_d_secure_options[:eci],
           three_d_secure_options[:cavv]
         )
-        post[:'3ds_version'] = three_d_secure_options[:version]
+        post[:'3ds_version'] = three_d_secure_options[:version] == '2' ? '2.0' : three_d_secure_options[:version]
         post[:'3ds_dstrxid'] = three_d_secure_options[:ds_transaction_id]
       end
 
@@ -358,8 +364,13 @@ module ActiveMerchant #:nodoc:
       end
 
       def add_processor(post, options)
-        post[:r1] = options[:processor] || 'CREDORAX'
+        post[:r1] = options[:processor] if options[:processor]
         post[:r2] = options[:processor_merchant_id] if options[:processor_merchant_id]
+      end
+
+      def add_authorization_details(post, options)
+        post[:a10] = options[:authorization_type] if options[:authorization_type]
+        post[:a11] = options[:multiple_capture_count] if options[:multiple_capture_count]
       end
 
       ACTIONS = {
@@ -372,7 +383,8 @@ module ActiveMerchant #:nodoc:
         purchase_void: '7',
         refund_void: '8',
         capture_void: '9',
-        threeds_completion: '92'
+        threeds_completion: '92',
+        referral_cft: '34'
       }
 
       def commit(action, params, reference_action = nil)

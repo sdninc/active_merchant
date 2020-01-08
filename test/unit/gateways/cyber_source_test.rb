@@ -103,6 +103,14 @@ class CyberSourceTest < Test::Unit::TestCase
     end.respond_with(successful_purchase_response)
   end
 
+  def test_purchase_includes_merchant_descriptor
+    stub_comms do
+      @gateway.purchase(100, @credit_card, merchant_descriptor: 'Spreedly')
+    end.check_request do |endpoint, data, headers|
+      assert_match(/<merchantDescriptor>Spreedly<\/merchantDescriptor>/, data)
+    end.respond_with(successful_purchase_response)
+  end
+
   def test_authorize_includes_issuer_additional_data
     stub_comms do
       @gateway.authorize(100, @credit_card, order_id: '1', issuer_additional_data: @issuer_additional_data)
@@ -124,6 +132,14 @@ class CyberSourceTest < Test::Unit::TestCase
       @gateway.authorize(100, @credit_card, commerce_indicator: 'internet')
     end.check_request do |endpoint, data, headers|
       assert_match(/<commerceIndicator>internet<\/commerceIndicator>/m, data)
+    end.respond_with(successful_authorization_response)
+  end
+
+  def test_authorize_includes_installment_total_count
+    stub_comms do
+      @gateway.authorize(100, @credit_card, order_id: '1', installment_total_count: 5)
+    end.check_request do |endpoint, data, headers|
+      assert_match(/<installment>\s+<totalCount>5<\/totalCount>\s+<\/installment>/, data)
     end.respond_with(successful_authorization_response)
   end
 
@@ -263,6 +279,22 @@ class CyberSourceTest < Test::Unit::TestCase
     assert response_capture.test?
   end
 
+  def test_capture_includes_local_tax_amount
+    stub_comms do
+      @gateway.capture(100, '1842651133440156177166', local_tax_amount: '0.17')
+    end.check_request do |endpoint, data, headers|
+      assert_match(/<otherTax>\s+<localTaxAmount>0.17<\/localTaxAmount>\s+<\/otherTax>/, data)
+    end.respond_with(successful_capture_response)
+  end
+
+  def test_capture_includes_national_tax_amount
+    stub_comms do
+      @gateway.capture(100, '1842651133440156177166', national_tax_amount: '0.05')
+    end.check_request do |endpoint, data, headers|
+      assert_match(/<otherTax>\s+<nationalTaxAmount>0.05<\/nationalTaxAmount>\s+<\/otherTax>/, data)
+    end.respond_with(successful_capture_response)
+  end
+
   def test_successful_credit_card_capture_with_elo_request
     @gateway.stubs(:ssl_post).returns(successful_authorization_response, successful_capture_response)
     assert response = @gateway.authorize(@amount, @elo_credit_card, @options)
@@ -271,6 +303,14 @@ class CyberSourceTest < Test::Unit::TestCase
     assert response_capture = @gateway.capture(@amount, response.authorization)
     assert response_capture.success?
     assert response_capture.test?
+  end
+
+  def test_capture_includes_mdd_fields
+    stub_comms do
+      @gateway.capture(100, '1846925324700976124593', order_id: '1', mdd_field_2: 'CustomValue2', mdd_field_3: 'CustomValue3')
+    end.check_request do |endpoint, data, headers|
+      assert_match(/field2>CustomValue2.*field3>CustomValue3</m, data)
+    end.respond_with(successful_capture_response)
   end
 
   def test_successful_credit_card_purchase_request
@@ -382,6 +422,30 @@ class CyberSourceTest < Test::Unit::TestCase
     assert_success(@gateway.credit(@amount, response.authorization, @options))
   end
 
+  def test_credit_includes_merchant_descriptor
+    stub_comms do
+      @gateway.credit(@amount, @credit_card, merchant_descriptor: 'Spreedly')
+    end.check_request do |endpoint, data, headers|
+      assert_match(/<merchantDescriptor>Spreedly<\/merchantDescriptor>/, data)
+    end.respond_with(successful_card_credit_response)
+  end
+
+  def test_credit_includes_issuer_additional_data
+    stub_comms do
+      @gateway.credit(@amount, @credit_card, issuer_additional_data: @issuer_additional_data)
+    end.check_request do |endpoint, data, headers|
+      assert_match(/<issuer>\s+<additionalData>#{@issuer_additional_data}<\/additionalData>\s+<\/issuer>/m, data)
+    end.respond_with(successful_card_credit_response)
+  end
+
+  def test_credit_includes_mdd_fields
+    stub_comms do
+      @gateway.credit(@amount, @credit_card, mdd_field_2: 'CustomValue2', mdd_field_3: 'CustomValue3')
+    end.check_request do |endpoint, data, headers|
+      assert_match(/field2>CustomValue2.*field3>CustomValue3</m, data)
+    end.respond_with(successful_card_credit_response)
+  end
+
   def test_successful_void_capture_request
     @gateway.stubs(:ssl_post).returns(successful_capture_response, successful_auth_reversal_response)
     assert response_capture = @gateway.capture(@amount, '1846925324700976124593')
@@ -398,6 +462,26 @@ class CyberSourceTest < Test::Unit::TestCase
     assert response.test?
     assert response_void = @gateway.void(response.authorization, @options)
     assert response_void.success?
+  end
+
+  def test_successful_void_with_issuer_additional_data
+    authorization = '1000;1842651133440156177166;AP4JY+Or4xRonEAOERAyMzQzOTEzMEM0MFZaNUZCBgDH3fgJ8AEGAMfd+AnwAwzRpAAA7RT/;authorize;100;USD;'
+
+    stub_comms do
+      @gateway.void(authorization, issuer_additional_data: @issuer_additional_data)
+    end.check_request do |endpoint, data, headers|
+      assert_match(/<issuer>\s+<additionalData>#{@issuer_additional_data}<\/additionalData>\s+<\/issuer>/m, data)
+    end.respond_with(successful_void_response)
+  end
+
+  def test_void_includes_mdd_fields
+    authorization = '1000;1842651133440156177166;AP4JY+Or4xRonEAOERAyMzQzOTEzMEM0MFZaNUZCBgDH3fgJ8AEGAMfd+AnwAwzRpAAA7RT/;authorize;100;USD;'
+
+    stub_comms do
+      @gateway.void(authorization, mdd_field_2: 'CustomValue2', mdd_field_3: 'CustomValue3')
+    end.check_request do |endpoint, data, headers|
+      assert_match(/field2>CustomValue2.*field3>CustomValue3</m, data)
+    end.respond_with(successful_void_response)
   end
 
   def test_successful_void_authorization_with_elo_request
@@ -707,6 +791,14 @@ class CyberSourceTest < Test::Unit::TestCase
 
     assert response = @gateway.purchase(@amount, @credit_card, @options)
     assert_failure response
+  end
+
+  def test_address_email_has_a_default_when_email_option_is_empty
+    stub_comms do
+      @gateway.authorize(100, @credit_card, email: '')
+    end.check_request do |endpoint, data, headers|
+      assert_match('<email>null@cybersource.com</email>', data)
+    end.respond_with(successful_capture_response)
   end
 
   private

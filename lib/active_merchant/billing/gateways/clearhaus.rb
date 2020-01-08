@@ -53,14 +53,15 @@ module ActiveMerchant #:nodoc:
         post = {}
         add_invoice(post, amount, options)
 
-        action = if payment.respond_to?(:number)
-                   add_payment(post, payment)
-                   '/authorizations'
-                 elsif payment.kind_of?(String)
-                   "/cards/#{payment}/authorizations"
-                 else
-                   raise ArgumentError.new("Unknown payment type #{payment.inspect}")
-        end
+        action =
+          if payment.respond_to?(:number)
+            add_payment(post, payment)
+            '/authorizations'
+          elsif payment.kind_of?(String)
+            "/cards/#{payment}/authorizations"
+          else
+            raise ArgumentError.new("Unknown payment type #{payment.inspect}")
+          end
 
         post[:recurring] = options[:recurring] if options[:recurring]
         post[:card][:pares] = options[:pares] if options[:pares]
@@ -159,12 +160,13 @@ module ActiveMerchant #:nodoc:
           end
         end
 
-        response = begin
-          parse(ssl_post(url, body, headers))
-        rescue ResponseError => e
-          raise unless(e.response.code.to_s =~ /400/)
-          parse(e.response.body)
-        end
+        response =
+          begin
+            parse(ssl_post(url, body, headers))
+          rescue ResponseError => e
+            raise unless(e.response.code.to_s =~ /400/)
+            parse(e.response.body)
+          end
 
         Response.new(
           success_from(response),
