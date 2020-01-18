@@ -52,6 +52,14 @@ module ActiveMerchant #:nodoc:
         # TODO: ExtData?
       end
 
+      def tokenize(creditcard, options = {})
+        post = {:ExtData => "<CustomerTokenization>T</CustomerTokenization>"}
+        add_creditcard(post, creditcard) # CardNum, CVNum, ExpDate, NameOnCard
+        add_address(post, creditcard, options) # Street, Zip
+
+        commit('Tokenize', nil, post)
+      end
+
       def purchase(money, creditcard, options = {})# TODO Sale
         post = {}
         add_invoice(post, options)
@@ -175,10 +183,11 @@ module ActiveMerchant #:nodoc:
       end
 
       def commit(action, money, parameters)
-        parameters[:TransType] = action
-        if(action != 'Void')
+        if(action != 'Void' && action != 'Tokenize')
             parameters[:Amount] = sprintf("%07.2f", money.to_f/100)
         end
+        action = 'Auth' if action == 'Tokenize'
+        parameters[:TransType] = action
 
         url = (test?)? TEST_URL : LIVE_URL
         puts "Using URL: #{url}"
@@ -210,7 +219,7 @@ module ActiveMerchant #:nodoc:
         post[:ExpDate] = ""
         post[:MagData] = ""
         post[:NameOnCard] = ""
-        post[:Amount] = ""
+        # post[:Amount] = "" # Empty amount breaks tokenizing a card
         post[:InvNum] = ""
         post[:PNRef] = ""
         post[:Zip] = ""
@@ -218,7 +227,7 @@ module ActiveMerchant #:nodoc:
         post[:CVNum] = ""
         post[:ExtData] = ""
         # use PostData class?
-        request = post.merge(parameters).map {|key, value| "#{key}=#{CGI.escape(value.to_s)}"}.join("&")
+        request = post.merge(parameters).map {|key, value| "#{key}=#{value.to_s}"}.join("&")
         request
       end
     end # class PayLeapGateway
