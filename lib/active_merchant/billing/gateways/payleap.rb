@@ -8,8 +8,11 @@ require "rexml/document"
 module ActiveMerchant #:nodoc:
   module Billing #:nodoc:
     class PayleapGateway < Gateway
-        TEST_URL = 'https://uat.payleap.com/TransactServices.svc/ProcessCreditCard'
-        LIVE_URL = 'https://secure1.payleap.com/TransactServices.svc/ProcessCreditCard'
+        TEST_URL = 'https://uat.payleap.com/TransactServices.svc/'
+        LIVE_URL = 'https://secure1.payleap.com/TransactServices.svc/'
+        
+        PROCESS_CREDIT_CARD_EP = 'ProcessCreditCard'
+        PROCESS_WITH_TOKEN_EP = 'ProcessDebitOrCreditCardWithAccounttoken'
 
       # The countries the gateway supports merchants from as 2 digit ISO country codes
       self.supported_countries = ['US']
@@ -58,6 +61,16 @@ module ActiveMerchant #:nodoc:
         add_address(post, creditcard, options) # Street, Zip
 
         commit('Tokenize', nil, post)
+      end
+
+      def purchase_with_token(money, token)
+        post = {
+            accounttoken: token,
+            CVNum: '',
+            ExtData: '<CreditCardOnly>T</CreditCardOnly>',
+        }
+
+        commit('Sale', money, post, PROCESS_WITH_TOKEN_EP)
       end
 
       def purchase(money, creditcard, options = {})# TODO Sale
@@ -182,14 +195,15 @@ module ActiveMerchant #:nodoc:
         respMsg
       end
 
-      def commit(action, money, parameters)
+      def commit(action, money, parameters, endpoint=nil)
         if(action != 'Void' && action != 'Tokenize')
             parameters[:Amount] = sprintf("%07.2f", money.to_f/100)
         end
         action = 'Auth' if action == 'Tokenize'
         parameters[:TransType] = action
 
-        url = (test?)? TEST_URL : LIVE_URL
+        url = ((test?)? TEST_URL : LIVE_URL) + (endpoint ? endpoint : PROCESS_CREDIT_CARD_EP)
+
         puts "Using URL: #{url}"
         puts "Start of POST data:"
         puts post_data(action, parameters)
