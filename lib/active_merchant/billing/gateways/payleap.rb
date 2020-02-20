@@ -202,7 +202,7 @@ module ActiveMerchant #:nodoc:
 
       def commit(action, money, parameters, endpoint=nil)
         if(action != 'Void' && action != 'Tokenize')
-            parameters[:Amount] = sprintf("%07.2f", money.to_f/100)
+            parameters[:Amount] = sprintf("%07.2f", money.to_f)
         end
         action = 'Auth' if action == 'Tokenize'
         parameters[:TransType] = action
