@@ -73,6 +73,16 @@ module ActiveMerchant #:nodoc:
         commit('Sale', money, post, PROCESS_WITH_TOKEN_EP)
       end
 
+      def auth_with_token(money, token)
+          post = {
+              accounttoken: token,
+              CVNum: '',
+              ExtData: '<CreditCardOnly>T</CreditCardOnly>'
+          }
+
+          commit('Auth', money, post, PROCESS_WITH_TOKEN_EP)
+      end
+
       def purchase(money, creditcard, options = {})# TODO Sale
         post = {}
         add_invoice(post, options)
